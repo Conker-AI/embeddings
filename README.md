@@ -1,5 +1,7 @@
 # Embeddings
 
+Part of **[Conker](https://github.com/alexeybe1kin/conker)**, independently usable and deployable. [Project map](https://github.com/alexeybe1kin/conker/blob/feat/dashboard/docs/conker-project.md) · [Connected local setup](https://github.com/alexeybe1kin/conker/blob/feat/dashboard/docs/local-windows-startup.md).
+
 Text to vectors. Nothing else.
 
 One job, one boundary: it holds no memory, takes no action, observes no machine. MemoryGate calls it
