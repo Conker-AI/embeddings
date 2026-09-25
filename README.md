@@ -1,11 +1,27 @@
-# Embeddings
+<p align="center"><img src="https://raw.githubusercontent.com/Conker-AI/conker/main/dashboard/public/conker.png" width="64" alt="" /></p>
+<h1 align="center">Embeddings</h1>
+<p align="center"><b>Text to vectors. Nothing else.</b><br/>
+A stateless service with a strict contract, so the embedding model is a deployment choice, not a rewrite.</p>
+<p align="center">
+  <a href="https://github.com/Conker-AI/embeddings/actions/workflows/ci.yml"><img src="https://github.com/Conker-AI/embeddings/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <img src="https://img.shields.io/badge/python-3.12-3776AB" alt="Python 3.12" />
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue" alt="MIT license" /></a>
+  <a href="https://github.com/Conker-AI/conker"><img src="https://img.shields.io/badge/part%20of-Conker-e36b2c" alt="Part of Conker" /></a>
+</p>
 
-Part of **[Conker](https://github.com/alexeybe1kin/conker)**, independently usable and deployable. [Project map](https://github.com/alexeybe1kin/conker/blob/feat/dashboard/docs/conker-project.md) · [Connected local setup](https://github.com/alexeybe1kin/conker/blob/feat/dashboard/docs/local-windows-startup.md).
+One job, one boundary: it holds no memory, takes no action and observes no machine.
+[MemoryGate](https://github.com/Conker-AI/memorygate) calls it to turn text into vectors, and it
+reports honestly when it cannot. Part of [Conker](https://github.com/Conker-AI/conker).
 
-Text to vectors. Nothing else.
+## Where it fits
 
-One job, one boundary: it holds no memory, takes no action, observes no machine. MemoryGate calls it
-to turn text into vectors, and it reports honestly when it cannot.
+```mermaid
+flowchart LR
+    MG[MemoryGate] -->|texts| EM[Embeddings] -->|vectors| MG
+    EM --> OL[Ollama<br/>embedding model]
+    classDef focus fill:#e36b2c,color:#fff,stroke:#b4521f
+    class EM focus
+```
 
 ## Its boundary
 
@@ -16,7 +32,7 @@ Existing separately is the point. MemoryGate used to load a model inside its own
 tied a web API's startup to a model load and made the provider unswappable. Behind an HTTP contract
 the model is a deployment choice — swapping it is a compose change, not a rewrite.
 
-## Run
+## Quick start
 
 ```bash
 cp .env.example .env
@@ -53,8 +69,8 @@ EMBEDDINGS_DIMENSION=768
 
 **Why Qwen3 and not the model MemoryGate's docs once promised.** `all-MiniLM-L6-v2` is English-first
 and from 2021. Conker's memory is substantially bilingual, and retrieval that degrades on half the
-corpus fails silently and asymmetrically — worse than failing outright. See ADR-0004 in the Conker
-repository.
+corpus fails silently and asymmetrically — worse than failing outright. See
+[ADR-0004](https://github.com/Conker-AI/conker/blob/main/docs/adr/0004-multilingual-embeddings-from-a-sidecar.md).
 
 ## API
 
@@ -82,6 +98,13 @@ caller that cannot tell them apart cannot act on either.
 
 Nothing is ever reported `ok` because it was configured. Every check is probed.
 
-## Licence
+## Development
 
-MIT.
+```bash
+pip install -r requirements-dev.txt
+python -m pytest -q
+```
+
+## License
+
+[MIT](LICENSE)
