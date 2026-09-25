@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import time
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -101,7 +101,7 @@ async def health():
         "status": "degraded" if degraded else "ok",
         "degraded": degraded,
         "checks": checks,
-        "checked_at": datetime.now(timezone.utc).isoformat(),
+        "checked_at": datetime.now(UTC).isoformat(),
     }
     _health_cache["result"] = result
     _health_cache["at"] = now
