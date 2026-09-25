@@ -31,10 +31,10 @@ class _Backend(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(payload)
 
-    def do_GET(self):  # noqa: N802
+    def do_GET(self):
         self._send(200, type(self).tags)
 
-    def do_POST(self):  # noqa: N802
+    def do_POST(self):
         self._send(200, {"embeddings": type(self).vectors})
 
     def log_message(self, *args):
@@ -75,9 +75,8 @@ def test_refuses_to_start_without_a_key(backend):
     os.environ.update(EMBEDDINGS_ADMIN_KEY="", EMBEDDINGS_OLLAMA_URL=url)
     from embeddings.main import app
 
-    with pytest.raises(RuntimeError, match="EMBEDDINGS_ADMIN_KEY"):
-        with TestClient(app):
-            pass
+    with pytest.raises(RuntimeError, match="EMBEDDINGS_ADMIN_KEY"), TestClient(app):
+        pass
 
 
 def test_a_short_key_is_refused_too(backend):
@@ -85,9 +84,8 @@ def test_a_short_key_is_refused_too(backend):
     os.environ.update(EMBEDDINGS_ADMIN_KEY="short", EMBEDDINGS_OLLAMA_URL=url)
     from embeddings.main import app
 
-    with pytest.raises(RuntimeError):
-        with TestClient(app):
-            pass
+    with pytest.raises(RuntimeError), TestClient(app):
+        pass
 
 
 def test_embed_requires_the_key(client):

@@ -26,6 +26,10 @@ jobs:
           pip install --quiet -r requirements-dev.txt
           pip install --quiet pytest httpx
 
+      - name: Lint
+        # Same pinned ruff and policy as Pi (ruff.toml).
+        run: python -m ruff check .
+
       - name: The module contract requires these files to exist
         run: |
           missing=""
