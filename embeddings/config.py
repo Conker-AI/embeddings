@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SERVICE_VERSION = "0.1.2"
+SERVICE_VERSION = "0.1.3"
 
 # Qwen3-Embedding-0.6B is the default because Conker's memory is bilingual and
 # the model that MemoryGate's documentation once promised - all-MiniLM-L6-v2 -
