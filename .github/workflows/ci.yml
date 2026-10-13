@@ -53,6 +53,10 @@ jobs:
           fi
           echo "all tracked text files are LF"
 
+      - name: File sizes
+        # 600 lines per source file; files that were already larger may only shrink.
+        run: python scripts/check_file_sizes.py
+
       - name: Tests
         run: python -m pytest tests/ --ignore=tests/test_module_contract.py --ignore=tests/test_retrieval_quality.py -q
 
