@@ -4,6 +4,12 @@ Versions are the module's own. A change to the request or response shape of
 `/embed`, `/model` or `/health` is a contract change and gets its own entry —
 replacing a module has to be a decision with visible consequences.
 
+## 0.1.3
+
+- Publish the existing embedding boundary under the canonical Conker-AI
+  registry namespace for the connected workspace installation. Request and
+  response contracts, model defaults and authority remain unchanged.
+
 ## 0.1.2
 
 - **`/health` reported `0.1.0` while the module shipped as v0.1.1.** The
