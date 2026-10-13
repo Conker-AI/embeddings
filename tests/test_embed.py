@@ -138,3 +138,43 @@ def test_health_separates_unreachable_from_model_not_pulled(client):
     assert body["checks"]["model"]["status"] == "unavailable"
     assert body["degraded"] == ["model"]
     _Backend.tags = {"models": [{"name": "qwen3-embedding:0.6b"}]}
+
+
+def test_new_application_lifetime_does_not_reuse_cached_health(backend):
+    _, url = backend
+    os.environ.update(
+        EMBEDDINGS_ADMIN_KEY=KEY,
+        EMBEDDINGS_OLLAMA_URL=url,
+        EMBEDDINGS_DIMENSION=str(DIM),
+    )
+    from embeddings.main import app
+
+    _Backend.tags = {"models": [{"name": "something-else:latest"}]}
+    with TestClient(app) as first:
+        assert first.get("/health").json()["status"] == "degraded"
+
+    _Backend.tags = {"models": [{"name": "qwen3-embedding:0.6b"}]}
+    with TestClient(app) as second:
+        assert second.get("/health").json()["status"] == "ok"
+
+
+def test_backend_client_does_not_inherit_proxy_environment(monkeypatch, backend):
+    _, url = backend
+    os.environ.update(EMBEDDINGS_ADMIN_KEY=KEY, EMBEDDINGS_OLLAMA_URL=url)
+    from embeddings import main
+
+    created = {}
+
+    class Client:
+        def __init__(self, **kwargs):
+            created.update(kwargs)
+
+        async def aclose(self):
+            pass
+
+    monkeypatch.setattr(main.httpx, "AsyncClient", Client)
+    with TestClient(main.app):
+        pass
+
+    assert created["trust_env"] is False
+    assert created["follow_redirects"] is False

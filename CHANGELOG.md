@@ -4,6 +4,13 @@ Versions are the module's own. A change to the request or response shape of
 `/embed`, `/model` or `/health` is a contract change and gets its own entry —
 replacing a module has to be a decision with visible consequences.
 
+## Unreleased
+
+- The Ollama client no longer inherits environment proxy configuration or follows
+  redirects, keeping backend traffic on the configured service boundary.
+- Health results are cleared at each application start so a restarted service
+  cannot report evidence cached from an earlier backend configuration.
+
 ## 0.1.3
 
 - Publish the existing embedding boundary under the canonical Conker-AI

@@ -41,8 +41,15 @@ async def lifespan(app: FastAPI):
             '    echo "EMBEDDINGS_ADMIN_KEY=$(openssl rand -base64 24)" >> .env\n'
             "    docker compose up -d embeddings\n"
         )
+    # A new application lifetime must probe its own backend and configuration.
+    _health_cache.clear()
     app.state.settings = settings
-    app.state.client = httpx.AsyncClient(base_url=settings.ollama_url, timeout=60.0)
+    app.state.client = httpx.AsyncClient(
+        base_url=settings.ollama_url,
+        timeout=60.0,
+        trust_env=False,
+        follow_redirects=False,
+    )
     try:
         yield
     finally:
