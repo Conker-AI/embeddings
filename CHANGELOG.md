@@ -6,6 +6,9 @@ replacing a module has to be a decision with visible consequences.
 
 ## Unreleased
 
+- A weekly security check (`.github/workflows/security.yml`) audits every dependency this
+  repository ships against the public advisory databases each Monday and whenever they
+  change, and fails loudly.
 - The Ollama client no longer inherits environment proxy configuration or follows
   redirects, keeping backend traffic on the configured service boundary.
 - Health results are cleared at each application start so a restarted service
