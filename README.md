@@ -4,6 +4,7 @@
 A stateless service with a strict contract, so the embedding model is a deployment choice, not a rewrite.</p>
 <p align="center">
   <a href="https://github.com/Conker-AI/embeddings/actions/workflows/ci.yml"><img src="https://github.com/Conker-AI/embeddings/actions/workflows/ci.yml/badge.svg" alt="CI" /></a>
+  <a href="https://github.com/Conker-AI/embeddings/tags"><img src="https://img.shields.io/github/v/tag/Conker-AI/embeddings?sort=semver&label=release" alt="Latest release" /></a>
   <img src="https://img.shields.io/badge/python-3.12-3776AB" alt="Python 3.12" />
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-AGPL--3.0-blue" alt="AGPL-3.0 license" /></a>
   <a href="https://github.com/Conker-AI/conker"><img src="https://img.shields.io/badge/part%20of-Conker-e36b2c" alt="Part of Conker" /></a>
@@ -33,6 +34,8 @@ tied a web API's startup to a model load and made the provider unswappable. Behi
 the model is a deployment choice — swapping it is a compose change, not a rewrite.
 
 ## Quick start
+
+Requires Docker with Compose. Published image: `ghcr.io/conker-ai/embeddings`.
 
 ```bash
 cp .env.example .env
