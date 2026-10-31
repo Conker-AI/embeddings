@@ -11,6 +11,7 @@ and ADR-0007 in the Conker repository.
 """
 from __future__ import annotations
 
+import hmac
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -60,7 +61,11 @@ app = FastAPI(title="Embeddings", version=SERVICE_VERSION, lifespan=lifespan)
 
 
 def require_key(x_embeddings_key: str | None = Header(None, alias="X-Embeddings-Key")) -> str:
-    if x_embeddings_key != app.state.settings.admin_key:
+    # Constant time, so response timing does not tell a caller how much of a guess was right.
+    # Compared as bytes: compare_digest refuses str with characters outside ASCII, and such a
+    # header is a wrong key (401), not a crash.
+    given = (x_embeddings_key or "").encode()
+    if not hmac.compare_digest(given, app.state.settings.admin_key.encode()):
         raise HTTPException(401, "missing or invalid X-Embeddings-Key")
     return "admin"
 

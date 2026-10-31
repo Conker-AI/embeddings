@@ -6,6 +6,10 @@ replacing a module has to be a decision with visible consequences.
 
 ## Unreleased
 
+- The admin key is compared in constant time (`hmac.compare_digest`, as bytes), so response
+  timing no longer tells a caller how many leading characters of a guess were right. A key with
+  characters outside ASCII is refused with 401 like any other wrong key.
+
 ## 0.1.4
 
 - The Ollama client no longer inherits environment proxy configuration or follows
