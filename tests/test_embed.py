@@ -93,6 +93,29 @@ def test_embed_requires_the_key(client):
     assert client.get("/model").status_code == 401
 
 
+def test_a_wrong_key_is_refused_whatever_its_characters(client):
+    near = KEY[:-1] + "5"
+    for wrong in (near.encode(), b"", "ключ-не-тот".encode(), KEY.encode() + b"\xff"):
+        assert client.post("/embed", json={"texts": ["hello"]}, headers={"X-Embeddings-Key": wrong}).status_code == 401
+        assert client.get("/model", headers={"X-Embeddings-Key": wrong}).status_code == 401
+    assert client.get("/model", headers=headers()).status_code == 200
+
+
+def test_the_key_is_compared_in_constant_time(client, monkeypatch):
+    import embeddings.main as main
+
+    seen = []
+    real = main.hmac.compare_digest
+
+    def recording(a, b):
+        seen.append((a, b))
+        return real(a, b)
+
+    monkeypatch.setattr(main.hmac, "compare_digest", recording)
+    assert client.get("/model", headers=headers()).status_code == 200
+    assert seen == [(KEY.encode(), KEY.encode())]
+
+
 def test_health_needs_no_key(client):
     assert client.get("/health").status_code == 200
 
