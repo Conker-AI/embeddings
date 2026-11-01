@@ -285,3 +285,31 @@ def test_a_malformed_backend_answer_is_degraded_not_500(client, monkeypatch):
     body = client.get("/health").json()
     assert body["status"] == "degraded"
     assert body["checks"]["backend"]["reason"] == "malformed backend response"
+
+
+@pytest.mark.parametrize("malformed_vector", [
+    [5],  # element is not a list
+    [None],  # null element
+    [["a", "b", "c", "d"]],  # right width, not numbers
+    [[True, True, True, True]],  # booleans
+    [[1, 2, 3, None]],  # null in vector
+    [[1, 2, 3, [4]]],  # nested list
+    [[1, 2, 3, float("nan")]],  # NaN
+    [[1, 2, 3, float("inf")]],  # Infinity
+])
+def test_a_malformed_vector_is_refused_with_503(client, monkeypatch, malformed_vector):
+    """Malformed vectors should be refused with 503, not returned or causing 500."""
+    monkeypatch.setattr(_Backend, "vectors", malformed_vector)
+    response = client.post("/embed", json={"texts": ["test"]}, headers=headers())
+    assert response.status_code == 503
+    assert "malformed vector" in response.json()["detail"]
+
+
+def test_integers_and_floats_are_both_valid_vectors(client, monkeypatch):
+    """Both integers and floats should be accepted as valid vector elements."""
+    valid_vectors = [[1, 2, 3, 4], [0.5, -1, 2.25, 0]]
+    monkeypatch.setattr(_Backend, "vectors", valid_vectors)
+    response = client.post("/embed", json={"texts": ["test1", "test2"]}, headers=headers())
+    assert response.status_code == 200
+    body = response.json()
+    assert body["vectors"] == valid_vectors
