@@ -12,6 +12,7 @@ and ADR-0007 in the Conker repository.
 from __future__ import annotations
 
 import hmac
+import math
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -27,6 +28,20 @@ HEALTH_CACHE_SECONDS = 5.0
 MAX_BATCH = 256
 
 _health_cache: dict = {}
+
+
+def _is_vector(vector) -> bool:
+    """Check if a vector contains valid numeric elements."""
+    if not isinstance(vector, list):
+        return False
+    for element in vector:
+        if not isinstance(element, (int, float)):
+            return False
+        if isinstance(element, bool):
+            return False
+        if not math.isfinite(element):
+            return False
+    return True
 
 
 def _with_tag(name: str) -> str:
@@ -162,6 +177,8 @@ async def embed(request: EmbedRequest):
     if len(vectors) != len(request.texts):
         raise HTTPException(503, "embedding backend returned an incomplete batch")
     for vector in vectors:
+        if not isinstance(vector, list):
+            raise HTTPException(503, "embedding backend returned a malformed vector")
         if len(vector) != settings.dimension:
             # Never silently return a vector of the wrong width: it would be
             # written into an index built for another shape.
@@ -170,5 +187,7 @@ async def embed(request: EmbedRequest):
                 f"model returned dimension {len(vector)}, expected {settings.dimension}; "
                 "EMBEDDINGS_DIMENSION does not match the configured model",
             )
+        if not _is_vector(vector):
+            raise HTTPException(503, "embedding backend returned a malformed vector")
 
     return {"model": settings.model, "dimension": settings.dimension, "vectors": vectors}
