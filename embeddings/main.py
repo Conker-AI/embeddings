@@ -29,6 +29,13 @@ MAX_BATCH = 256
 _health_cache: dict = {}
 
 
+def _with_tag(name: str) -> str:
+    """Return name with :latest tag if it has no tag."""
+    if ":" in name.rsplit("/", 1)[-1]:
+        return name
+    return name + ":latest"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
@@ -84,15 +91,40 @@ async def _probe_ollama(settings: Settings, client: httpx.AsyncClient) -> tuple[
     try:
         response = await client.get("/api/tags", timeout=5.0)
         response.raise_for_status()
+
+        # Parse and validate the response body
+        try:
+            body = response.json()
+        except Exception:
+            return ({"status": "unavailable", "reason": "malformed backend response"},
+                    {"status": "unknown", "reason": "backend unavailable"})
+
+        if not isinstance(body, dict):
+            return ({"status": "unavailable", "reason": "malformed backend response"},
+                    {"status": "unknown", "reason": "backend unavailable"})
+
+        models = body.get("models", [])
+        if not isinstance(models, list):
+            return ({"status": "unavailable", "reason": "malformed backend response"},
+                    {"status": "unknown", "reason": "backend unavailable"})
+
+        names = set()
+        for model in models:
+            if not isinstance(model, dict):
+                return ({"status": "unavailable", "reason": "malformed backend response"},
+                        {"status": "unknown", "reason": "backend unavailable"})
+            name = model.get("name")
+            if isinstance(name, str):
+                names.add(_with_tag(name))
+
+        present = _with_tag(settings.model) in names
+        model_check = {"status": "ok"} if present else {"status": "unavailable", "reason": "model not pulled"}
+        return {"status": "ok"}, model_check
+
     except Exception as exc:
         reason = type(exc).__name__
         return ({"status": "unavailable", "reason": reason},
                 {"status": "unknown", "reason": "backend unreachable"})
-
-    names = {m.get("name", "") for m in response.json().get("models", [])}
-    present = settings.model in names or any(n.split(":")[0] == settings.model.split(":")[0] for n in names)
-    model_check = {"status": "ok"} if present else {"status": "unavailable", "reason": "model not pulled"}
-    return {"status": "ok"}, model_check
 
 
 @app.get("/health")

@@ -6,6 +6,8 @@ replacing a module has to be a decision with visible consequences.
 
 ## Unreleased
 
+- Health endpoint fixes: model presence now matches exactly (sibling tags are reported as "model not pulled"), and malformed backend responses return degraded health instead of a 500 error.
+- Container runs as non-root user (65532:65532) and dev compose pins Ollama 0.40.6 by digest.
 - The admin key is compared in constant time (`hmac.compare_digest`, as bytes), so response
   timing no longer tells a caller how many leading characters of a guess were right. A key with
   characters outside ASCII is refused with 401 like any other wrong key.
