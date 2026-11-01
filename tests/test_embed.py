@@ -18,10 +18,11 @@ DIM = 4
 
 
 class _Backend(BaseHTTPRequestHandler):
-    """Stands in for Ollama. `vectors` and `tags` are set per test."""
+    """Stands in for Ollama. `vectors`, `tags`, and `raw` are set per test."""
 
     vectors: list[list[float]] = []
     tags: dict = {"models": [{"name": "qwen3-embedding:0.6b"}]}
+    raw: bytes | None = None
 
     def _send(self, code: int, body: dict):
         payload = json.dumps(body).encode()
@@ -32,7 +33,14 @@ class _Backend(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_GET(self):
-        self._send(200, type(self).tags)
+        if type(self).raw is not None:
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(type(self).raw)))
+            self.end_headers()
+            self.wfile.write(type(self).raw)
+        else:
+            self._send(200, type(self).tags)
 
     def do_POST(self):
         self._send(200, {"embeddings": type(self).vectors})
@@ -201,3 +209,79 @@ def test_backend_client_does_not_inherit_proxy_environment(monkeypatch, backend)
 
     assert created["trust_env"] is False
     assert created["follow_redirects"] is False
+
+
+def test_a_sibling_tag_is_not_the_configured_model(client, monkeypatch):
+    """A model with a different tag should not be considered present."""
+    # Configure the backend to only have the 4b tag
+    monkeypatch.setattr(_Backend, "tags", {"models": [{"name": "qwen3-embedding:4b"}]})
+
+    body = client.get("/health").json()
+    assert body["status"] == "degraded"
+    assert body["degraded"] == ["model"]
+    assert body["checks"]["model"]["reason"] == "model not pulled"
+
+
+def test_an_untagged_name_means_latest(client, monkeypatch):
+    """An untagged model name should be treated as :latest."""
+    # Test case 1: configure without tag, backend has :latest
+    old_model = os.environ.get("EMBEDDINGS_MODEL")
+    try:
+        os.environ["EMBEDDINGS_MODEL"] = "nomic-embed-text"
+        monkeypatch.setattr(_Backend, "tags", {"models": [{"name": "nomic-embed-text:latest"}]})
+
+        # Restart the app to pick up the new model
+        from embeddings.main import app
+        with TestClient(app) as c:
+            body = c.get("/health").json()
+            assert body["status"] == "ok"
+            assert body["checks"]["model"]["status"] == "ok"
+
+        # Test case 2: configure with :latest, backend has no tag
+        os.environ["EMBEDDINGS_MODEL"] = "nomic-embed-text:latest"
+        monkeypatch.setattr(_Backend, "tags", {"models": [{"name": "nomic-embed-text"}]})
+
+        with TestClient(app) as c:
+            body = c.get("/health").json()
+            assert body["status"] == "ok"
+            assert body["checks"]["model"]["status"] == "ok"
+
+    finally:
+        if old_model is not None:
+            os.environ["EMBEDDINGS_MODEL"] = old_model
+        elif "EMBEDDINGS_MODEL" in os.environ:
+            del os.environ["EMBEDDINGS_MODEL"]
+
+
+def test_a_malformed_backend_answer_is_degraded_not_500(client, monkeypatch):
+    """Malformed backend responses should return degraded health, not 500."""
+    import embeddings.main as main
+
+    # Test case 1: raw non-JSON response
+    monkeypatch.setattr(_Backend, "raw", b"not json")
+    main._health_cache.clear()  # Clear cache between cases
+    body = client.get("/health").json()
+    assert body["status"] == "degraded"
+    assert body["checks"]["backend"]["reason"] == "malformed backend response"
+
+    # Test case 2: models is not a list
+    monkeypatch.setattr(_Backend, "raw", None)
+    monkeypatch.setattr(_Backend, "tags", {"models": [1, 2]})
+    main._health_cache.clear()
+    body = client.get("/health").json()
+    assert body["status"] == "degraded"
+    assert body["checks"]["backend"]["reason"] == "malformed backend response"
+
+    # Test case 3: models entry is not a dict
+    monkeypatch.setattr(_Backend, "tags", {"models": [1]})
+    main._health_cache.clear()
+    body = client.get("/health").json()
+    assert body["status"] == "degraded"
+    assert body["checks"]["backend"]["reason"] == "malformed backend response"
+
+    # Test case 4: models is a string instead of list
+    monkeypatch.setattr(_Backend, "tags", {"models": "x"})
+    main._health_cache.clear()
+    body = client.get("/health").json()
+    assert body["status"] == "degraded"
+    assert body["checks"]["backend"]["reason"] == "malformed backend response"

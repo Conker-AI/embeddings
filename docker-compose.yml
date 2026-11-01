@@ -2,7 +2,8 @@ name: embeddings
 
 services:
   ollama:
-    image: ollama/ollama
+    # Ollama 0.40.6, pinned by digest as in Conker's versions.env.
+    image: ollama/ollama@sha256:265409e1d931028a8f7d5a32bcbafddd7bffbc6cc629d77efe9560adf692a5e7
     container_name: embeddings-ollama
     restart: unless-stopped
     volumes:

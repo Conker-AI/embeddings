@@ -29,6 +29,13 @@ MAX_BATCH = 256
 _health_cache: dict = {}
 
 
+def _with_tag(name: str) -> str:
+    """Return name with :latest tag if it has no tag."""
+    if ":" in name.rsplit("/", 1)[-1]:
+        return name
+    return name + ":latest"
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     settings = get_settings()
@@ -84,15 +91,22 @@ async def _probe_ollama(settings: Settings, client: httpx.AsyncClient) -> tuple[
     try:
         response = await client.get("/api/tags", timeout=5.0)
         response.raise_for_status()
+
+        body = response.json()
+        models = body.get("models") if isinstance(body, dict) else None
+        if not isinstance(models, list) or not all(isinstance(m, dict) for m in models):
+            raise ValueError("malformed backend response")
+        names = {_with_tag(m["name"]) for m in models if isinstance(m.get("name"), str)}
+        present = _with_tag(settings.model) in names
+        model_check = {"status": "ok"} if present else {"status": "unavailable", "reason": "model not pulled"}
+        return {"status": "ok"}, model_check
+    except ValueError:  # includes a body that is not JSON
+        return ({"status": "unavailable", "reason": "malformed backend response"},
+                {"status": "unknown", "reason": "backend unavailable"})
     except Exception as exc:
         reason = type(exc).__name__
         return ({"status": "unavailable", "reason": reason},
                 {"status": "unknown", "reason": "backend unreachable"})
-
-    names = {m.get("name", "") for m in response.json().get("models", [])}
-    present = settings.model in names or any(n.split(":")[0] == settings.model.split(":")[0] for n in names)
-    model_check = {"status": "ok"} if present else {"status": "unavailable", "reason": "model not pulled"}
-    return {"status": "ok"}, model_check
 
 
 @app.get("/health")
