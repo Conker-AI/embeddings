@@ -15,15 +15,18 @@ import pytest
 from embeddings.config import DEFAULT_DIMENSION, DEFAULT_MODEL, SERVICE_VERSION, get_settings
 
 
+@pytest.fixture(autouse=True)
+def clean_environment(monkeypatch):
+    """No EMBEDDINGS_* variable from the host leaks into a test."""
+    for name in [k for k in os.environ if k.startswith("EMBEDDINGS_")]:
+        monkeypatch.delenv(name, raising=False)
+
+
 class TestConfigDefaults:
     """Test default values when no environment variables are set."""
 
     def test_defaults_with_no_env_vars(self, monkeypatch):
         """With none set: use documented defaults."""
-        # Clear all EMBEDDINGS_* variables
-        env_vars = [k for k in os.environ if k.startswith("EMBEDDINGS_")]
-        for var in env_vars:
-            monkeypatch.delenv(var, raising=False)
 
         settings = get_settings()
 
@@ -40,10 +43,6 @@ class TestConfigEnvironmentVariables:
 
     def test_all_variables_set(self, monkeypatch):
         """Every variable set: each field takes it; port and dimension are ints."""
-        # Clear existing vars first
-        env_vars = [k for k in os.environ if k.startswith("EMBEDDINGS_")]
-        for var in env_vars:
-            monkeypatch.delenv(var, raising=False)
 
         # Set all variables
         monkeypatch.setenv("EMBEDDINGS_HOST", "1.2.3.4")
@@ -64,10 +63,6 @@ class TestConfigEnvironmentVariables:
 
     def test_values_are_stripped(self, monkeypatch):
         """Values are stripped: whitespace is removed."""
-        # Clear existing vars first
-        env_vars = [k for k in os.environ if k.startswith("EMBEDDINGS_")]
-        for var in env_vars:
-            monkeypatch.delenv(var, raising=False)
 
         # Test with whitespace
         monkeypatch.setenv("EMBEDDINGS_HOST", "  1.2.3.4  ")
@@ -88,10 +83,6 @@ class TestConfigEnvironmentVariables:
 
     def test_ollama_url_trailing_slashes_removed(self, monkeypatch):
         """URL trailing slashes are stripped correctly."""
-        # Clear existing vars first
-        env_vars = [k for k in os.environ if k.startswith("EMBEDDINGS_")]
-        for var in env_vars:
-            monkeypatch.delenv(var, raising=False)
 
         # Test single trailing slash
         monkeypatch.setenv("EMBEDDINGS_OLLAMA_URL", "http://x:1/")
@@ -105,10 +96,6 @@ class TestConfigEnvironmentVariables:
 
     def test_invalid_port_raises_value_error(self, monkeypatch):
         """EMBEDDINGS_PORT="abc" raises ValueError."""
-        # Clear existing vars first
-        env_vars = [k for k in os.environ if k.startswith("EMBEDDINGS_")]
-        for var in env_vars:
-            monkeypatch.delenv(var, raising=False)
 
         monkeypatch.setenv("EMBEDDINGS_PORT", "abc")
 
@@ -117,10 +104,6 @@ class TestConfigEnvironmentVariables:
 
     def test_invalid_dimension_raises_value_error(self, monkeypatch):
         """EMBEDDINGS_DIMENSION="1.5" raises ValueError."""
-        # Clear existing vars first
-        env_vars = [k for k in os.environ if k.startswith("EMBEDDINGS_")]
-        for var in env_vars:
-            monkeypatch.delenv(var, raising=False)
 
         monkeypatch.setenv("EMBEDDINGS_DIMENSION", "1.5")
 
@@ -133,10 +116,6 @@ class TestConfigImmutability:
 
     def test_settings_is_frozen(self, monkeypatch):
         """Settings is frozen: assigning a field raises FrozenInstanceError."""
-        # Clear existing vars first
-        env_vars = [k for k in os.environ if k.startswith("EMBEDDINGS_")]
-        for var in env_vars:
-            monkeypatch.delenv(var, raising=False)
 
         settings = get_settings()
 
@@ -167,7 +146,7 @@ class TestServiceVersion:
         changelog_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "CHANGELOG.md")
 
         try:
-            with open(changelog_path) as f:
+            with open(changelog_path, encoding="utf-8") as f:
                 changelog_content = f.read()
         except FileNotFoundError:
             pytest.skip("CHANGELOG.md not found")
