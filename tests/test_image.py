@@ -1,10 +1,14 @@
 """Image and compose configuration tests."""
 from __future__ import annotations
 
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parent.parent
+
 
 def test_the_image_does_not_run_as_root():
     """Read Dockerfile and verify the last USER line exists and is not root."""
-    with open("Dockerfile", encoding="utf-8") as f:
+    with open(ROOT / "Dockerfile", encoding="utf-8") as f:
         lines = f.readlines()
 
     user_lines = [line.strip() for line in lines if line.strip().startswith("USER ")]
@@ -20,7 +24,7 @@ def test_the_image_does_not_run_as_root():
 
 def test_the_dev_ollama_is_pinned_by_digest():
     """Read docker-compose.yml and verify the ollama service uses a digest."""
-    with open("docker-compose.yml", encoding="utf-8") as f:
+    with open(ROOT / "docker-compose.yml", encoding="utf-8") as f:
         content = f.read()
 
     # Find the ollama service section

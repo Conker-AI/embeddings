@@ -92,35 +92,17 @@ async def _probe_ollama(settings: Settings, client: httpx.AsyncClient) -> tuple[
         response = await client.get("/api/tags", timeout=5.0)
         response.raise_for_status()
 
-        # Parse and validate the response body
-        try:
-            body = response.json()
-        except Exception:
-            return ({"status": "unavailable", "reason": "malformed backend response"},
-                    {"status": "unknown", "reason": "backend unavailable"})
-
-        if not isinstance(body, dict):
-            return ({"status": "unavailable", "reason": "malformed backend response"},
-                    {"status": "unknown", "reason": "backend unavailable"})
-
-        models = body.get("models", [])
-        if not isinstance(models, list):
-            return ({"status": "unavailable", "reason": "malformed backend response"},
-                    {"status": "unknown", "reason": "backend unavailable"})
-
-        names = set()
-        for model in models:
-            if not isinstance(model, dict):
-                return ({"status": "unavailable", "reason": "malformed backend response"},
-                        {"status": "unknown", "reason": "backend unavailable"})
-            name = model.get("name")
-            if isinstance(name, str):
-                names.add(_with_tag(name))
-
+        body = response.json()
+        models = body.get("models") if isinstance(body, dict) else None
+        if not isinstance(models, list) or not all(isinstance(m, dict) for m in models):
+            raise ValueError("malformed backend response")
+        names = {_with_tag(m["name"]) for m in models if isinstance(m.get("name"), str)}
         present = _with_tag(settings.model) in names
         model_check = {"status": "ok"} if present else {"status": "unavailable", "reason": "model not pulled"}
         return {"status": "ok"}, model_check
-
+    except ValueError:  # includes a body that is not JSON
+        return ({"status": "unavailable", "reason": "malformed backend response"},
+                {"status": "unknown", "reason": "backend unavailable"})
     except Exception as exc:
         reason = type(exc).__name__
         return ({"status": "unavailable", "reason": reason},
