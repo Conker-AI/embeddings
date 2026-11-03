@@ -16,6 +16,7 @@ import math
 import time
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
+from typing import Annotated
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException
@@ -26,6 +27,7 @@ from .config import SERVICE_VERSION, Settings, get_settings
 HEALTHY = {"ok", "not_configured"}
 HEALTH_CACHE_SECONDS = 5.0
 MAX_BATCH = 256
+MAX_TEXT_CHARS = 100_000
 
 _health_cache: dict = {}
 
@@ -93,7 +95,7 @@ def require_key(x_embeddings_key: str | None = Header(None, alias="X-Embeddings-
 
 
 class EmbedRequest(BaseModel):
-    texts: list[str] = Field(min_length=1, max_length=MAX_BATCH)
+    texts: list[Annotated[str, Field(max_length=MAX_TEXT_CHARS)]] = Field(min_length=1, max_length=MAX_BATCH)
 
 
 async def _probe_ollama(settings: Settings, client: httpx.AsyncClient) -> tuple[dict, dict]:
