@@ -6,6 +6,12 @@ replacing a module has to be a decision with visible consequences.
 
 ## Unreleased
 
+## 0.1.5
+
+- `/embed` refuses a text over 100,000 characters with 422 instead of sending it to Ollama
+  (MemoryGate caps memories at 32,000, so real memories are never refused), and malformed vectors
+  from the backend answer 503 instead of being passed on.
+
 - `/health` reports the model only when that exact name and tag is pulled (a sibling tag is
   "model not pulled"), and a malformed Ollama answer reports the backend unavailable instead of
   failing with 500.
