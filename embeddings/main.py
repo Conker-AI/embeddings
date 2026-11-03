@@ -19,13 +19,17 @@ from datetime import UTC, datetime
 
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException
-from pydantic import BaseModel, Field
+from typing import Annotated
+
+from pydantic import BaseModel, Field, field_validator
 
 from .config import SERVICE_VERSION, Settings, get_settings
 
 HEALTHY = {"ok", "not_configured"}
 HEALTH_CACHE_SECONDS = 5.0
 MAX_BATCH = 256
+MAX_TEXT_CHARS = 100_000
+MAX_TOTAL_CHARS = MAX_BATCH * MAX_TEXT_CHARS
 
 _health_cache: dict = {}
 
@@ -93,7 +97,14 @@ def require_key(x_embeddings_key: str | None = Header(None, alias="X-Embeddings-
 
 
 class EmbedRequest(BaseModel):
-    texts: list[str] = Field(min_length=1, max_length=MAX_BATCH)
+    texts: list[Annotated[str, Field(max_length=MAX_TEXT_CHARS)]] = Field(min_length=1, max_length=MAX_BATCH)
+
+    @field_validator("texts")
+    @classmethod
+    def total_cap(cls, texts: list[str]) -> list[str]:
+        if sum(len(t) for t in texts) > MAX_TOTAL_CHARS:
+            raise ValueError(f"total payload exceeds {MAX_TOTAL_CHARS} characters")
+        return texts
 
 
 async def _probe_ollama(settings: Settings, client: httpx.AsyncClient) -> tuple[dict, dict]:
