@@ -6,6 +6,11 @@ replacing a module has to be a decision with visible consequences.
 
 ## Unreleased
 
+## 0.1.6
+
+- **The image takes Debian's security fixes newer than its base** (apt, CVE-2026-109518).
+  No code change.
+
 ## 0.1.5
 
 - `/embed` refuses a text over 100,000 characters with 422 instead of sending it to Ollama
