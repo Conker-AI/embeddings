@@ -6,6 +6,11 @@ replacing a module has to be a decision with visible consequences.
 
 ## Unreleased
 
+## 0.1.7
+
+- **The image takes Debian's zlib security fix** (zlib1g CVE-2026-76844 and CVE-2026-85091,
+  fixed in 1:1.3.dfsg+really1.3.1-1+deb13u1). Rebuild only, no code change.
+
 ## 0.1.6
 
 - **The image takes Debian's security fixes newer than its base** (apt, CVE-2026-109518).
