@@ -3,6 +3,7 @@
 The backend is a real HTTP server on a real socket rather than a mock, so the
 failure cases fail for the reasons they would in production.
 """
+
 from __future__ import annotations
 
 import json
@@ -104,7 +105,12 @@ def test_embed_requires_the_key(client):
 def test_a_wrong_key_is_refused_whatever_its_characters(client):
     near = KEY[:-1] + "5"
     for wrong in (near.encode(), b"", "ключ-не-тот".encode(), KEY.encode() + b"\xff"):
-        assert client.post("/embed", json={"texts": ["hello"]}, headers={"X-Embeddings-Key": wrong}).status_code == 401
+        assert (
+            client.post(
+                "/embed", json={"texts": ["hello"]}, headers={"X-Embeddings-Key": wrong}
+            ).status_code
+            == 401
+        )
         assert client.get("/model", headers={"X-Embeddings-Key": wrong}).status_code == 401
     assert client.get("/model", headers=headers()).status_code == 200
 
@@ -232,6 +238,7 @@ def test_an_untagged_name_means_latest(client, monkeypatch):
 
         # Restart the app to pick up the new model
         from embeddings.main import app
+
         with TestClient(app) as c:
             body = c.get("/health").json()
             assert body["status"] == "ok"
@@ -287,16 +294,19 @@ def test_a_malformed_backend_answer_is_degraded_not_500(client, monkeypatch):
     assert body["checks"]["backend"]["reason"] == "malformed backend response"
 
 
-@pytest.mark.parametrize("malformed_vector", [
-    [5],  # element is not a list
-    [None],  # null element
-    [["a", "b", "c", "d"]],  # right width, not numbers
-    [[True, True, True, True]],  # booleans
-    [[1, 2, 3, None]],  # null in vector
-    [[1, 2, 3, [4]]],  # nested list
-    [[1, 2, 3, float("nan")]],  # NaN
-    [[1, 2, 3, float("inf")]],  # Infinity
-])
+@pytest.mark.parametrize(
+    "malformed_vector",
+    [
+        [5],  # element is not a list
+        [None],  # null element
+        [["a", "b", "c", "d"]],  # right width, not numbers
+        [[True, True, True, True]],  # booleans
+        [[1, 2, 3, None]],  # null in vector
+        [[1, 2, 3, [4]]],  # nested list
+        [[1, 2, 3, float("nan")]],  # NaN
+        [[1, 2, 3, float("inf")]],  # Infinity
+    ],
+)
 def test_a_malformed_vector_is_refused_with_503(client, monkeypatch, malformed_vector):
     """Malformed vectors should be refused with 503, not returned or causing 500."""
     monkeypatch.setattr(_Backend, "vectors", malformed_vector)

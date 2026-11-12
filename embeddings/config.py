@@ -2,6 +2,7 @@
 
 Precedence is environment -> file -> default, as the module contract requires.
 """
+
 from __future__ import annotations
 
 import os
