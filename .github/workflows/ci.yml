@@ -32,7 +32,9 @@ jobs:
 
       - name: Lint
         # Same pinned ruff and policy as Pi (ruff.toml).
-        run: python -m ruff check .
+        run: |
+          python -m ruff check .
+          python -m ruff format --check .
 
       - name: The module contract requires these files to exist
         run: |
@@ -61,8 +63,15 @@ jobs:
         # 600 lines per source file; files that were already larger may only shrink.
         run: python scripts/check_file_sizes.py
 
+      - name: Types
+        # pyright basic mode (pyrightconfig.json). It found no errors when it arrived, so
+        # there is no type-baseline.txt and any error fails.
+        run: python scripts/check_types.py
+
       - name: Tests
-        run: python -m pytest tests/ --ignore=tests/test_module_contract.py --ignore=tests/test_retrieval_quality.py -q
+        # The coverage floor is the coverage measured when it arrived, rounded down, so it
+        # only stops coverage from falling (.coveragerc names what is measured).
+        run: python -m pytest tests/ --ignore=tests/test_module_contract.py --ignore=tests/test_retrieval_quality.py -q --cov --cov-report=term --cov-fail-under=96
 
   contract:
     # The health contract is an HTTP contract, so it is asserted against a

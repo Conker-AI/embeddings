@@ -20,6 +20,7 @@ encoding. An earlier hand-run of this measurement piped Cyrillic through curl
 on Git Bash, which mangled it - every text became similar mojibake, every pair
 scored ~0.92, and the model looked broken when the measurement was.
 """
+
 from __future__ import annotations
 
 import math
@@ -51,8 +52,10 @@ def embed():
 
     def _embed(texts: list[str]) -> list[list[float]]:
         response = httpx.post(
-            f"{URL}/embed", json={"texts": texts},
-            headers={"X-Embeddings-Key": KEY}, timeout=120.0,
+            f"{URL}/embed",
+            json={"texts": texts},
+            headers={"X-Embeddings-Key": KEY},
+            timeout=120.0,
         )
         response.raise_for_status()
         return response.json()["vectors"]

@@ -9,6 +9,7 @@ load and made the provider unswappable. Behind an HTTP contract the model is a
 deployment choice: swapping it is a compose change, not a rewrite. See ADR-0004
 and ADR-0007 in the Conker repository.
 """
+
 from __future__ import annotations
 
 import hmac
@@ -95,7 +96,9 @@ def require_key(x_embeddings_key: str | None = Header(None, alias="X-Embeddings-
 
 
 class EmbedRequest(BaseModel):
-    texts: list[Annotated[str, Field(max_length=MAX_TEXT_CHARS)]] = Field(min_length=1, max_length=MAX_BATCH)
+    texts: list[Annotated[str, Field(max_length=MAX_TEXT_CHARS)]] = Field(
+        min_length=1, max_length=MAX_BATCH
+    )
 
 
 async def _probe_ollama(settings: Settings, client: httpx.AsyncClient) -> tuple[dict, dict]:
@@ -115,15 +118,21 @@ async def _probe_ollama(settings: Settings, client: httpx.AsyncClient) -> tuple[
             raise ValueError("malformed backend response")
         names = {_with_tag(m["name"]) for m in models if isinstance(m.get("name"), str)}
         present = _with_tag(settings.model) in names
-        model_check = {"status": "ok"} if present else {"status": "unavailable", "reason": "model not pulled"}
+        model_check = (
+            {"status": "ok"} if present else {"status": "unavailable", "reason": "model not pulled"}
+        )
         return {"status": "ok"}, model_check
     except ValueError:  # includes a body that is not JSON
-        return ({"status": "unavailable", "reason": "malformed backend response"},
-                {"status": "unknown", "reason": "backend unavailable"})
+        return (
+            {"status": "unavailable", "reason": "malformed backend response"},
+            {"status": "unknown", "reason": "backend unavailable"},
+        )
     except Exception as exc:
         reason = type(exc).__name__
-        return ({"status": "unavailable", "reason": reason},
-                {"status": "unknown", "reason": "backend unreachable"})
+        return (
+            {"status": "unavailable", "reason": reason},
+            {"status": "unknown", "reason": "backend unreachable"},
+        )
 
 
 @app.get("/health")
@@ -168,7 +177,9 @@ async def embed(request: EmbedRequest):
     client: httpx.AsyncClient = app.state.client
 
     try:
-        response = await client.post("/api/embed", json={"model": settings.model, "input": request.texts})
+        response = await client.post(
+            "/api/embed", json={"model": settings.model, "input": request.texts}
+        )
         response.raise_for_status()
         vectors = response.json().get("embeddings") or []
     except Exception as exc:

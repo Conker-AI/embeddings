@@ -1,0 +1,9 @@
+# Coverage for CI's floor (pytest --cov --cov-fail-under=N in ci.yml).
+[run]
+source =
+    embeddings
+omit =
+    */tests/*
+
+[report]
+skip_empty = true
