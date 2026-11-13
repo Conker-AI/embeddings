@@ -6,6 +6,8 @@ replacing a module has to be a decision with visible consequences.
 
 ## Unreleased
 
+## 0.1.8
+
 - **A dimension or port outside its range refuses to start.** `EMBEDDINGS_DIMENSION=0` (or a
   negative value) started, `/model` published it as the contract and every `/embed` answered 503;
   now the service stops at startup naming the setting (dimension 1-65536, port 1-65535).
