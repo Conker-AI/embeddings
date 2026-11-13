@@ -10,6 +10,9 @@ replacing a module has to be a decision with visible consequences.
   version's CHANGELOG section. Every image carries an SPDX SBOM (BuildKit attestation) inside
   the image index, and the signed build provenance covers that index digest. Check one with
   `gh attestation verify oci://IMAGE@DIGEST --owner Conker-AI`.
+- **Repository tooling, no behaviour change.** The shared .editorconfig, pre-commit hooks that run
+  the CI checks, CODEOWNERS and Renovate config; ruff format; a pyright type check with no errors
+  (the baseline may only shrink); CI fails below 96% test coverage. (#20)
 
 ## 0.1.7
 
