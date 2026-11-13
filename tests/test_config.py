@@ -102,6 +102,24 @@ class TestConfigEnvironmentVariables:
         with pytest.raises(ValueError, match="invalid literal for int"):
             get_settings()
 
+    @pytest.mark.parametrize(
+        ("name", "value"),
+        [
+            ("EMBEDDINGS_DIMENSION", "0"),
+            ("EMBEDDINGS_DIMENSION", "-768"),
+            ("EMBEDDINGS_DIMENSION", "65537"),
+            ("EMBEDDINGS_PORT", "0"),
+            ("EMBEDDINGS_PORT", "70000"),
+        ],
+    )
+    def test_out_of_range_numbers_refuse_to_start(self, monkeypatch, name, value):
+        """A dimension or port outside its range is refused, never published by /model."""
+
+        monkeypatch.setenv(name, value)
+
+        with pytest.raises(ValueError, match=f"{name} out of range"):
+            get_settings()
+
     def test_invalid_dimension_raises_value_error(self, monkeypatch):
         """EMBEDDINGS_DIMENSION="1.5" raises ValueError."""
 

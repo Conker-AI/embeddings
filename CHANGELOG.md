@@ -6,6 +6,10 @@ replacing a module has to be a decision with visible consequences.
 
 ## Unreleased
 
+- **A dimension or port outside its range refuses to start.** `EMBEDDINGS_DIMENSION=0` (or a
+  negative value) started, `/model` published it as the contract and every `/embed` answered 503;
+  now the service stops at startup naming the setting (dimension 1-65536, port 1-65535).
+
 - **Each tag gets a GitHub Release page and an SBOM.** The Release page's notes are the
   version's CHANGELOG section. Every image carries an SPDX SBOM (BuildKit attestation) inside
   the image index, and the signed build provenance covers that index digest. Check one with
