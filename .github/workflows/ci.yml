@@ -71,7 +71,7 @@ jobs:
       - name: Tests
         # The coverage floor is the coverage measured when it arrived, rounded down, so it
         # only stops coverage from falling (.coveragerc names what is measured).
-        run: python -m pytest tests/ --ignore=tests/test_module_contract.py --ignore=tests/test_retrieval_quality.py -q --cov --cov-report=term --cov-fail-under=96
+        run: python -m pytest tests/ --ignore=tests/test_module_contract.py --ignore=tests/test_retrieval_quality.py -q --cov --cov-report=term --cov-fail-under=100
 
   contract:
     # The health contract is an HTTP contract, so it is asserted against a
