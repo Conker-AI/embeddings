@@ -196,6 +196,17 @@ def test_another_backend_400_is_still_503_and_not_retried(client):
     assert len(_Backend.requests) == 1
 
 
+def test_only_ollamas_context_refusal_counts_as_too_long():
+    import httpx
+
+    from embeddings.main import _too_long
+
+    assert _too_long(httpx.Response(400, json={"error": "input length exceeds the context length"}))
+    assert not _too_long(httpx.Response(400, content=b"<html>bad gateway</html>"))
+    assert not _too_long(httpx.Response(400, json={"error": "model not found"}))
+    assert not _too_long(httpx.Response(500, json={"error": "exceeds the context length"}))
+
+
 def test_a_wrong_width_vector_is_refused_rather_than_returned(client):
     """A vector of the wrong width written into an index built for another
     shape is a corruption that surfaces much later as bad search results.

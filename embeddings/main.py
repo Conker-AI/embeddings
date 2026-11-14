@@ -214,10 +214,8 @@ async def _embed_batch(
             single = await _ollama_embed(client, model, [text], truncate=True)
             truncated.append(index)
         single.raise_for_status()
-        found = single.json().get("embeddings") or []
-        if len(found) != 1:
-            return [], []  # reported as an incomplete batch
-        vectors.append(found[0])
+        # A miscount here is caught by the caller's batch-length check.
+        vectors.extend(single.json().get("embeddings") or [])
     return vectors, truncated
 
 
