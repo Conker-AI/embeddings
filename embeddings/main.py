@@ -171,17 +171,61 @@ def model():
     return {"model": settings.model, "dimension": settings.dimension}
 
 
+def _too_long(response: httpx.Response) -> bool:
+    """Ollama's refusal of an input longer than the model's context (truncate=false)."""
+    if response.status_code != 400:
+        return False
+    try:
+        error = str(response.json().get("error", ""))
+    except ValueError:
+        return False
+    return "context length" in error.lower()
+
+
+async def _ollama_embed(
+    client: httpx.AsyncClient, model: str, texts: list[str], *, truncate: bool
+) -> httpx.Response:
+    return await client.post(
+        "/api/embed", json={"model": model, "input": texts, "truncate": truncate}
+    )
+
+
+async def _embed_batch(
+    client: httpx.AsyncClient, model: str, texts: list[str]
+) -> tuple[list, list[int]]:
+    """Embed `texts`; return the vectors and the indices Ollama had to cut.
+
+    Ollama truncates input longer than the model's context by default and says
+    nothing, so a long text's vector silently stands for its first part only.
+    Asking with truncate=false makes Ollama refuse instead; the batch is then
+    embedded one text at a time and only the texts that do not fit are embedded
+    truncated and named in `truncated`, so the caller knows which vectors are
+    partial. A refusal would leave such a text without any vector for ever.
+    """
+    response = await _ollama_embed(client, model, texts, truncate=False)
+    if not _too_long(response):
+        response.raise_for_status()
+        return response.json().get("embeddings") or [], []
+    vectors: list = []
+    truncated: list[int] = []
+    for index, text in enumerate(texts):
+        single = await _ollama_embed(client, model, [text], truncate=False)
+        if _too_long(single):
+            single = await _ollama_embed(client, model, [text], truncate=True)
+            truncated.append(index)
+        single.raise_for_status()
+        # A miscount here is caught by the caller's batch-length check.
+        vectors.extend(single.json().get("embeddings") or [])
+    return vectors, truncated
+
+
 @app.post("/embed", dependencies=[Depends(require_key)])
 async def embed(request: EmbedRequest):
     settings: Settings = app.state.settings
     client: httpx.AsyncClient = app.state.client
 
     try:
-        response = await client.post(
-            "/api/embed", json={"model": settings.model, "input": request.texts}
-        )
-        response.raise_for_status()
-        vectors = response.json().get("embeddings") or []
+        vectors, truncated = await _embed_batch(client, settings.model, request.texts)
     except Exception as exc:
         # 503, not 500: the caller should degrade to lexical retrieval and say
         # so, not treat this as a bug in its own request.
@@ -203,4 +247,9 @@ async def embed(request: EmbedRequest):
         if not _is_vector(vector):
             raise HTTPException(503, "embedding backend returned a malformed vector")
 
-    return {"model": settings.model, "dimension": settings.dimension, "vectors": vectors}
+    return {
+        "model": settings.model,
+        "dimension": settings.dimension,
+        "vectors": vectors,
+        "truncated": truncated,
+    }

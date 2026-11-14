@@ -24,6 +24,9 @@ class _Backend(BaseHTTPRequestHandler):
     vectors: list[list[float]] = []
     tags: dict = {"models": [{"name": "qwen3-embedding:0.6b"}]}
     raw: bytes | None = None
+    context_limit: int | None = None
+    post_error: dict | None = None
+    requests: list[dict] = []
 
     def _send(self, code: int, body: dict):
         payload = json.dumps(body).encode()
@@ -44,7 +47,22 @@ class _Backend(BaseHTTPRequestHandler):
             self._send(200, type(self).tags)
 
     def do_POST(self):
-        self._send(200, {"embeddings": type(self).vectors})
+        body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        cls = type(self)
+        cls.requests.append(body)
+        if cls.post_error is not None:
+            self._send(400, cls.post_error)
+            return
+        if cls.context_limit is None:
+            self._send(200, {"embeddings": cls.vectors})
+            return
+        # Like Ollama: input longer than the context is refused with truncate=false and
+        # cut silently with truncate=true; each text gets a vector that names its length.
+        limit = cls.context_limit
+        if not body.get("truncate", True) and any(len(t) > limit for t in body["input"]):
+            self._send(400, {"error": "the input length exceeds the context length"})
+            return
+        self._send(200, {"embeddings": [[float(min(len(t), limit))] * DIM for t in body["input"]]})
 
     def log_message(self, *args):
         pass
@@ -52,6 +70,9 @@ class _Backend(BaseHTTPRequestHandler):
 
 @pytest.fixture()
 def backend():
+    _Backend.context_limit = None
+    _Backend.post_error = None
+    _Backend.requests = []
     server = ThreadingHTTPServer(("127.0.0.1", 0), _Backend)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -140,6 +161,50 @@ def test_embed_returns_vectors_with_the_declared_width(client):
     assert body["dimension"] == DIM
     assert len(body["vectors"]) == 2
     assert all(len(v) == DIM for v in body["vectors"])
+
+
+def test_texts_that_fit_are_embedded_whole_and_nothing_is_marked(client):
+    _Backend.context_limit = 10
+    body = client.post("/embed", json={"texts": ["short", "fits"]}, headers=headers()).json()
+    assert body["truncated"] == []
+    assert [v[0] for v in body["vectors"]] == [5.0, 4.0]
+    assert _Backend.requests == [
+        {"model": "qwen3-embedding:0.6b", "input": ["short", "fits"], "truncate": False}
+    ], "Ollama must be asked not to cut"
+
+
+def test_a_text_longer_than_the_context_is_cut_and_named(client):
+    """Ollama cuts long input by default and says nothing, so the vector of a long
+    memory stood for its first part only. Now the cut text is named; the others
+    in the batch are embedded whole and keep their order."""
+    _Backend.context_limit = 10
+    texts = ["short", "x" * 40, "fits too"]
+    response = client.post("/embed", json={"texts": texts}, headers=headers())
+    assert response.status_code == 200
+    body = response.json()
+    assert body["truncated"] == [1]
+    assert [v[0] for v in body["vectors"]] == [5.0, 10.0, 8.0]
+    cut = [r for r in _Backend.requests if r["truncate"]]
+    assert cut == [{"model": "qwen3-embedding:0.6b", "input": ["x" * 40], "truncate": True}]
+
+
+def test_another_backend_400_is_still_503_and_not_retried(client):
+    """Only the context-length refusal leads to a cut; any other 400 is a backend fault."""
+    _Backend.post_error = {"error": 'model "qwen3-embedding:0.6b" not found'}
+    response = client.post("/embed", json={"texts": ["a"]}, headers=headers())
+    assert response.status_code == 503
+    assert len(_Backend.requests) == 1
+
+
+def test_only_ollamas_context_refusal_counts_as_too_long():
+    import httpx
+
+    from embeddings.main import _too_long
+
+    assert _too_long(httpx.Response(400, json={"error": "input length exceeds the context length"}))
+    assert not _too_long(httpx.Response(400, content=b"<html>bad gateway</html>"))
+    assert not _too_long(httpx.Response(400, json={"error": "model not found"}))
+    assert not _too_long(httpx.Response(500, json={"error": "exceeds the context length"}))
 
 
 def test_a_wrong_width_vector_is_refused_rather_than_returned(client):
