@@ -26,6 +26,8 @@ class _Backend(BaseHTTPRequestHandler):
     raw: bytes | None = None
     context_limit: int | None = None
     post_error: dict | None = None
+    get_status: int | None = None
+    post_status: int | None = None
     requests: list[dict] = []
 
     def _send(self, code: int, body: dict):
@@ -37,7 +39,9 @@ class _Backend(BaseHTTPRequestHandler):
         self.wfile.write(payload)
 
     def do_GET(self):
-        if type(self).raw is not None:
+        if type(self).get_status is not None:
+            self._send(type(self).get_status, {"error": "backend fault"})
+        elif type(self).raw is not None:
             self.send_response(200)
             self.send_header("Content-Type", "application/json")
             self.send_header("Content-Length", str(len(type(self).raw)))
@@ -50,6 +54,9 @@ class _Backend(BaseHTTPRequestHandler):
         body = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         cls = type(self)
         cls.requests.append(body)
+        if cls.post_status is not None:
+            self._send(cls.post_status, {"error": "backend fault"})
+            return
         if cls.post_error is not None:
             self._send(400, cls.post_error)
             return
@@ -388,3 +395,140 @@ def test_integers_and_floats_are_both_valid_vectors(client, monkeypatch):
     assert response.status_code == 200
     body = response.json()
     assert body["vectors"] == valid_vectors
+
+
+# Refusals and edge cases
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        {"texts": []},
+        {"texts": ["a"] * 257},
+        {"texts": ["x" * 100_001]},
+        {"texts": [1, 2]},
+        {"texts": None},
+        {"texts": "not a list"},
+        {},
+        [],
+    ],
+)
+def test_an_unusable_embed_request_is_refused_before_the_backend_is_asked(client, body):
+    response = client.post("/embed", json=body, headers=headers())
+    assert response.status_code == 422
+    assert _Backend.requests == []
+
+
+def test_a_body_that_is_not_json_is_refused(client):
+    response = client.post(
+        "/embed", content=b"{not json", headers={**headers(), "Content-Type": "application/json"}
+    )
+    assert response.status_code == 422
+    assert _Backend.requests == []
+
+
+def test_the_largest_allowed_batch_is_accepted(client, monkeypatch):
+    monkeypatch.setattr(_Backend, "vectors", [[0.0] * DIM] * 256)
+    response = client.post("/embed", json={"texts": ["a"] * 256}, headers=headers())
+    assert response.status_code == 200 and len(response.json()["vectors"]) == 256
+
+
+@pytest.mark.parametrize("path", ["/embed", "/model"])
+def test_the_key_is_checked_before_the_body(client, path):
+    response = client.request(
+        "POST" if path == "/embed" else "GET",
+        path,
+        json={"texts": []} if path == "/embed" else None,
+    )
+    assert response.status_code == 401
+
+
+@pytest.mark.parametrize(
+    "method,path", [("get", "/embed"), ("post", "/model"), ("post", "/health")]
+)
+def test_a_wrong_method_is_refused(client, method, path):
+    assert getattr(client, method)(path, headers=headers()).status_code == 405
+
+
+def test_a_backend_fault_on_embed_is_503_and_names_only_the_error_type(client, monkeypatch):
+    monkeypatch.setattr(_Backend, "post_status", 500)
+    response = client.post("/embed", json={"texts": ["a"]}, headers=headers())
+    assert response.status_code == 503
+    assert response.json()["detail"] == "embedding backend unavailable: HTTPStatusError"
+    assert "backend fault" not in response.text
+
+
+def test_a_backend_that_returns_no_vectors_is_an_incomplete_batch(client, monkeypatch):
+    monkeypatch.setattr(_Backend, "vectors", [])
+    response = client.post("/embed", json={"texts": ["a", "b"]}, headers=headers())
+    assert response.status_code == 503
+    assert "incomplete batch" in response.json()["detail"]
+
+
+def test_a_batch_with_a_missing_vector_is_refused_whole(client, monkeypatch):
+    monkeypatch.setattr(_Backend, "vectors", [[0.0] * DIM])
+    response = client.post("/embed", json={"texts": ["a", "b"]}, headers=headers())
+    assert response.status_code == 503
+
+
+def test_health_names_a_backend_that_answers_with_an_error(client, monkeypatch):
+    monkeypatch.setattr(_Backend, "get_status", 500)
+    body = client.get("/health").json()
+    assert body["status"] == "degraded"
+    assert body["degraded"] == ["backend", "model"]
+    assert body["checks"]["backend"] == {"status": "unavailable", "reason": "HTTPStatusError"}
+    assert body["checks"]["model"] == {"status": "unknown", "reason": "backend unreachable"}
+    assert "backend fault" not in json.dumps(body)
+
+
+def test_health_names_a_backend_that_is_not_listening(client, backend):
+    server, _ = backend
+    server.shutdown()
+    server.server_close()
+    body = client.get("/health").json()
+    assert body["status"] == "degraded"
+    assert body["checks"]["backend"]["status"] == "unavailable"
+    assert body["checks"]["backend"]["reason"] == "ConnectError"
+
+
+def test_health_is_reused_for_a_few_seconds_and_says_how_old_it_is(client, monkeypatch):
+    first = client.get("/health").json()
+    assert first["age_seconds"] == 0.0 and first["status"] == "ok"
+    monkeypatch.setattr(_Backend, "get_status", 500)
+    second = client.get("/health").json()
+    assert second["status"] == "ok", "a probe inside the cache window is not repeated"
+    assert second["checked_at"] == first["checked_at"]
+    assert second["age_seconds"] >= 0.0
+
+
+def test_health_probes_again_once_the_cache_is_old(client, monkeypatch):
+    import embeddings.main as main
+
+    assert client.get("/health").json()["status"] == "ok"
+    monkeypatch.setattr(_Backend, "get_status", 500)
+    monkeypatch.setitem(main._health_cache, "at", main._health_cache["at"] - 60)
+    assert client.get("/health").json()["status"] == "degraded"
+
+
+def test_a_value_that_is_not_a_list_is_not_a_vector():
+    from embeddings.main import _is_vector
+
+    assert not _is_vector("1234")
+    assert not _is_vector(None)
+    assert not _is_vector((1.0, 2.0))
+    assert _is_vector([])
+
+
+@pytest.mark.parametrize(
+    "name,expected",
+    [
+        ("model", "model:latest"),
+        ("model:7b", "model:7b"),
+        ("registry:5000/team/model", "registry:5000/team/model:latest"),
+        ("registry:5000/team/model:7b", "registry:5000/team/model:7b"),
+    ],
+)
+def test_a_model_name_without_a_tag_means_latest(name, expected):
+    from embeddings.main import _with_tag
+
+    assert _with_tag(name) == expected
