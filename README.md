@@ -81,7 +81,7 @@ corpus fails silently and asymmetrically — worse than failing outright. See
 |---|---|---|
 | `GET /health` | none | Module contract shape. Probes the backend and whether the model is pulled. |
 | `GET /model` | key | Model identity and dimension. |
-| `POST /embed` | key | `{"texts": [...]}` → `{"model", "dimension", "vectors"}`. Up to 256 per call. |
+| `POST /embed` | key | `{"texts": [...]}` → `{"model", "dimension", "vectors", "truncated"}`. Up to 256 per call; `truncated` lists the indices of texts longer than the model's context, embedded from their first part. |
 
 **Dimension is part of the contract, not a detail.** Changing the model changes the vector width and
 invalidates every stored vector, so a caller must be able to detect the change *before* it writes.
