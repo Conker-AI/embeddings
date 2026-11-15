@@ -9,13 +9,13 @@ replacing a module has to be a decision with visible consequences.
 - **Quality pass: refusal and edge-case tests.** 27 tests through the HTTP API (unusable
   request bodies and methods, backend faults on `/embed` and `/health`, a backend that is not
   listening, the health cache and its age, model names without a tag); coverage 97% -> 100%
-  (floor 96 -> 100). Type baseline was already 0. No behaviour change.
+  (floor 96 -> 100). Type baseline was already 0. No behaviour change. (#26)
 - **A text longer than the model's context is no longer cut silently.** Ollama truncates such
   input by default, so a long text's vector stood for its first part only and nobody knew.
   `/embed` now asks with `truncate: false`; when Ollama refuses for length, the batch is embedded
   one text at a time, only the texts that do not fit are embedded truncated, and the reply's new
   `truncated` field lists their indices (empty when nothing was cut). Not a refusal: a refused
-  text would never get a vector and MemoryGate's outbox would retry it for ever.
+  text would never get a vector and MemoryGate's outbox would retry it for ever. (#25)
 
 ## 0.1.8
 
