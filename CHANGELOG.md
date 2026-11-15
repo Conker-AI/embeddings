@@ -6,6 +6,8 @@ replacing a module has to be a decision with visible consequences.
 
 ## Unreleased
 
+## 0.1.9
+
 - **Quality pass: refusal and edge-case tests.** 27 tests through the HTTP API (unusable
   request bodies and methods, backend faults on `/embed` and `/health`, a backend that is not
   listening, the health cache and its age, model names without a tag); coverage 97% -> 100%
