@@ -163,18 +163,14 @@ class TestServiceVersion:
         """SERVICE_VERSION matches the first ## version heading in CHANGELOG.md."""
         changelog_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "CHANGELOG.md")
 
-        try:
-            with open(changelog_path, encoding="utf-8") as f:
-                changelog_content = f.read()
-        except FileNotFoundError:
-            pytest.skip("CHANGELOG.md not found")
+        with open(changelog_path, encoding="utf-8") as f:
+            changelog_content = f.read()
 
         # Look for version headings in the form "## 0.1.4" or "## [0.1.4]"
         version_pattern = r"^##\s*(?:\[)?(\d+\.\d+\.\d+)(?:\])?"
         matches = re.findall(version_pattern, changelog_content, re.MULTILINE)
 
-        if not matches:
-            pytest.skip("No version heading found in CHANGELOG.md")
+        assert matches, "CHANGELOG.md has no version heading"
 
         first_version = matches[0]
         assert first_version == SERVICE_VERSION, (

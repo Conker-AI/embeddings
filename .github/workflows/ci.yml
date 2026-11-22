@@ -63,6 +63,10 @@ jobs:
         # 600 lines per source file; files that were already larger may only shrink.
         run: python scripts/check_file_sizes.py
 
+      - name: Test skips
+        # Every skip/xfail marker needs a reason and the per-file counts in skip-baseline.txt may only shrink.
+        run: python scripts/check_skips.py
+
       - name: Types
         # pyright basic mode (pyrightconfig.json). It found no errors when it arrived, so
         # there is no type-baseline.txt and any error fails.
@@ -104,7 +108,14 @@ jobs:
           exit 1
 
       - name: Module contract
-        run: python -m pytest tests/test_module_contract.py -q
+        # A contract test that skips (no service answered) proves nothing, so any SKIPPED fails the step.
+        run: |
+          set -o pipefail
+          python -m pytest tests/test_module_contract.py -q -rs -p no:cacheprovider | tee "$RUNNER_TEMP/pytest.out"
+          if grep -q "^SKIPPED" "$RUNNER_TEMP/pytest.out"; then
+            echo "::error::The module contract test skipped; it must run against the container."
+            exit 1
+          fi
 
       - if: always()
         run: docker compose down -v

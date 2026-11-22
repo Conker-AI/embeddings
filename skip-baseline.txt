@@ -1,0 +1,4 @@
+# Test skip/xfail markers per file; counts may only shrink (scripts/check_skips.py).
+# Lower or delete a line when its file improves; never add a line or raise a count.
+tests/test_module_contract.py 1
+tests/test_retrieval_quality.py 3
