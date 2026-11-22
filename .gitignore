@@ -5,3 +5,8 @@ __pycache__/
 .pytest_cache/
 .coverage
 .coverage.*
+
+# Local test scratch
+.test-runs/
+.test-tmp/
+.test-deps/
